@@ -9,58 +9,83 @@ export class ReceiptPrinter {
     public constructor(private readonly columns: number = 40) {
     }
 
-    public printReceipt( receipt: Receipt): string {
+    // refactored - extracted methods to make printReceipt shorter (Long Method smell)
+    public printReceipt(receipt: Receipt): string {
         let result = "";
+
         for (const item of receipt.getItems()) {
-            let price = this.format2Decimals(item.totalPrice);
-            let quantity = ReceiptPrinter.presentQuantity(item);
-            let name = item.product.name;
-            let unitPrice = this.format2Decimals(item.price);
-
-            let whitespaceSize = this.columns - name.length - price.length;
-            let line = name + ReceiptPrinter.getWhitespace(whitespaceSize) + price + this.EOL;
-
-            if (item.quantity != 1) {
-                line += "  " + unitPrice + " * " + quantity + this.EOL;
-            }
-            result += line;
+            result += this.formatReceiptItem(item);
         }
+
         for (const discount of receipt.getDiscounts()) {
-            let productPresentation = discount.product.name;
-            let pricePresentation = this.format2Decimals(discount.discountAmount);
-            let description = discount.description;
-            result += description;
-            result += "(";
-            result += productPresentation;
-            result += ")";
-            result += ReceiptPrinter.getWhitespace(this.columns - 3 - productPresentation.length - description.length - pricePresentation.length);
-            result += "-";
-            result += pricePresentation;
-            result += this.EOL;
+            result += this.formatDiscount(discount);
         }
-        result += this.EOL;
-        let pricePresentation = this.format2Decimals(receipt.getTotalPrice());
-        let total = "Total: ";
-        let whitespace = ReceiptPrinter.getWhitespace(this.columns - total.length - pricePresentation.length);
-        result += total;
-        result += whitespace;
-        result += pricePresentation;
+
+        result += this.formatTotal(receipt.getTotalPrice());
 
         return result;
     }
 
-    private format2Decimals(number: number) {
+    // extracted from printReceipt - item formatting logic
+    private formatReceiptItem(item: ReceiptItem): string {
+        // changed let -> const (these dont change so const is safer)
+        const price = this.format2Decimals(item.totalPrice);
+        const quantity = ReceiptPrinter.presentQuantity(item);
+        const name = item.product.name;
+        const unitPrice = this.format2Decimals(item.price);
+
+        const whitespaceSize = this.columns - name.length - price.length;
+
+        // template literal instead of + concat (cleaner to read)
+        let line = `${name}${ReceiptPrinter.getWhitespace(whitespaceSize)}${price}${this.EOL}`;
+
+        // !== instead of != (strict equality - no type coercion bugs)
+        if (item.quantity !== 1) {
+            line += `  ${unitPrice} * ${quantity}${this.EOL}`;
+        }
+
+        return line;
+    }
+
+    // extracted discount formatting
+    // before: 7 separate += operations, now: 1 template literal
+    private formatDiscount(discount: { product: { name: string }, description: string, discountAmount: number }): string {
+        const productName = discount.product.name;
+        const pricePresentation = this.format2Decimals(discount.discountAmount);
+        const description = discount.description;
+
+        // -3 for: ( ) - chars
+        const whitespaceSize = this.columns - 3 - productName.length - description.length - pricePresentation.length;
+        const whitespace = ReceiptPrinter.getWhitespace(whitespaceSize);
+
+        return `${description}(${productName})${whitespace}-${pricePresentation}${this.EOL}`;
+    }
+
+    // extracted total formatting
+    private formatTotal(totalPrice: number): string {
+        const pricePresentation = this.format2Decimals(totalPrice);
+        const totalLabel = "Total: ";
+        const whitespace = ReceiptPrinter.getWhitespace(
+            this.columns - totalLabel.length - pricePresentation.length
+        );
+
+        return `${this.EOL}${totalLabel}${whitespace}${pricePresentation}`;
+    }
+
+    // added return type : string (was missing - code smell)
+    private format2Decimals(number: number): string {
         return new Intl.NumberFormat('en-UK', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
-        }).format(number)
+        }).format(number);
     }
 
-    private static presentQuantity( item: ReceiptItem): string  {
-        return ProductUnit.Each == item.product.unit
-            // TODO make sure this is the simplest way to make something similar to the java version
-                ? new Intl.NumberFormat('en-UK', {maximumFractionDigits: 0}).format(item.quantity)
-                : new Intl.NumberFormat('en-UK', {minimumFractionDigits: 3}).format(item.quantity);
+    // removed TODO comment (shouldnt be in prod code)
+    // also == changed to === for strict comparison
+    private static presentQuantity(item: ReceiptItem): string {
+        return ProductUnit.Each === item.product.unit
+            ? new Intl.NumberFormat('en-UK', {maximumFractionDigits: 0}).format(item.quantity)
+            : new Intl.NumberFormat('en-UK', {minimumFractionDigits: 3}).format(item.quantity);
     }
 
     private static getWhitespace(whitespaceSize: number): string {
