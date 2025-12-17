@@ -4,21 +4,18 @@ import {ReceiptItem} from "./ReceiptItem"
 import * as _ from "lodash"
 
 export class Receipt {
-    private items: ReceiptItem[] = [];
-    private discounts: Discount[] = [];
+    // added readonly
+    private readonly items: ReceiptItem[] = [];
+    private readonly discounts: Discount[] = [];
 
+    // used reduce instead of for loop (cleaner)
     public getTotalPrice(): number {
-        let total = 0.0;
-        for (let item of this.items) {
-            total += item.totalPrice;
-        }
-        for ( let discount of this.discounts) {
-            total -= discount.discountAmount;
-        }
-        return total;
+        const itemsTotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        const discountsTotal = this.discounts.reduce((sum, d) => sum + d.discountAmount, 0);
+        return itemsTotal - discountsTotal;
     }
 
-    public addProduct( p: Product, quantity: number, price: number, totalPrice: number): void {
+    public addProduct(p: Product, quantity: number, price: number, totalPrice: number): void {
         this.items.push(new ReceiptItem(p, quantity, price, totalPrice));
     }
 
@@ -26,11 +23,12 @@ export class Receipt {
         return _.clone(this.items);
     }
 
-    public addDiscount( discount: Discount): void {
+    public addDiscount(discount: Discount): void {
         this.discounts.push(discount);
     }
 
+    // fixed: now clones like getItems (was inconsistent)
     public getDiscounts(): Discount[] {
-        return this.discounts;
+        return _.clone(this.discounts);
     }
 }
