@@ -8,6 +8,9 @@ import {Receipt} from "./Receipt"
 import {Offer} from "./Offer"
 import {SpecialOfferType} from "./SpecialOfferType"
 import {Bundle} from "./Bundle"
+import {Coupon} from "./Coupon"
+
+type AppliedCoupon = { coupon: Coupon, date: Date };
 
 type ProductQuantities = { [productName: string]: ProductQuantity }
 export type OffersByProduct = {[productName: string]: Offer};
@@ -192,5 +195,47 @@ export class ShoppingCart {
         }
 
         return minBundles === Infinity ? 0 : minBundles;
+    }
+
+    // handle coupon discounts
+    handleCoupons(receipt: Receipt, coupons: AppliedCoupon[], catalog: SupermarketCatalog): void {
+        for (const { coupon, date } of coupons) {
+            const discount = this.calculateCouponDiscount(coupon, date, catalog);
+            if (discount !== null) {
+                receipt.addDiscount(discount);
+            }
+        }
+    }
+
+    // calculate discount for a coupon
+    private calculateCouponDiscount(coupon: Coupon, date: Date, catalog: SupermarketCatalog): Discount | null {
+        // check if coupon is valid
+        if (!coupon.isValidOn(date) || coupon.isRedeemed()) {
+            return null;
+        }
+
+        const productQty = this._productQuantities[coupon.product.name];
+        if (!productQty) {
+            return null;
+        }
+
+        const quantity = productQty.quantity;
+        const requiredQty = coupon.requiredQuantity;
+
+        // need more than required qty to get discount on extra items
+        if (quantity <= requiredQty) {
+            return null;
+        }
+
+        const unitPrice = catalog.getUnitPrice(coupon.product);
+
+        // calculate how many items get discounted (max = requiredQty, single use)
+        const discountedItems = Math.min(quantity - requiredQty, requiredQty);
+        const discountAmount = discountedItems * unitPrice * coupon.discountPercent / 100.0;
+
+        // mark coupon as redeemed
+        coupon.redeem();
+
+        return new Discount(coupon.product, coupon.getDescription(), discountAmount);
     }
 }
