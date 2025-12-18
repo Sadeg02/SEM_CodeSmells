@@ -6,6 +6,7 @@ import {Offer} from "./Offer"
 import {SpecialOfferType} from "./SpecialOfferType"
 import {Bundle} from "./Bundle"
 import {Coupon} from "./Coupon"
+import {LoyaltyCard} from "./LoyaltyCard"
 
 // store coupon with its application date
 type AppliedCoupon = { coupon: Coupon, date: Date };
@@ -15,6 +16,8 @@ export class Teller {
     private readonly offers: OffersByProduct = {};
     private readonly bundles: Bundle[] = [];
     private readonly coupons: AppliedCoupon[] = [];
+    private loyaltyCard: LoyaltyCard | null = null;
+    private pointsToUse: number = 0;
 
     public constructor(private readonly catalog: SupermarketCatalog) {
     }
@@ -33,6 +36,16 @@ export class Teller {
         this.coupons.push({ coupon, date: currentDate });
     }
 
+    // set loyalty card for earning/spending points
+    public setLoyaltyCard(card: LoyaltyCard): void {
+        this.loyaltyCard = card;
+    }
+
+    // set points to use as payment
+    public usePoints(points: number): void {
+        this.pointsToUse = points;
+    }
+
     public checksOutArticlesFrom(theCart: ShoppingCart): Receipt {
         const receipt = new Receipt();
         const productQuantities = theCart.getItems();
@@ -49,6 +62,39 @@ export class Teller {
         theCart.handleBundles(receipt, this.bundles, this.catalog);
         theCart.handleCoupons(receipt, this.coupons, this.catalog);
 
+        // handle loyalty points
+        this.handleLoyalty(receipt);
+
+        // reset points to use after checkout
+        this.pointsToUse = 0;
+
         return receipt;
+    }
+
+    // handle loyalty card points
+    private handleLoyalty(receipt: Receipt): void {
+        if (!this.loyaltyCard) {
+            return;
+        }
+
+        let totalPrice = receipt.getTotalPrice();
+
+        // use points as payment (1 point = 1 euro)
+        if (this.pointsToUse > 0) {
+            // can't use more points than available or more than total
+            const maxPointsToUse = Math.min(this.pointsToUse, this.loyaltyCard.getPoints(), totalPrice);
+            const actualDeducted = this.loyaltyCard.deductPoints(maxPointsToUse);
+
+            if (actualDeducted > 0) {
+                receipt.applyPointsPayment(actualDeducted);
+                totalPrice -= actualDeducted;
+            }
+        }
+
+        // earn points for money spent (1 point per euro, rounded down)
+        const pointsEarned = Math.floor(totalPrice);
+        if (pointsEarned > 0) {
+            this.loyaltyCard.addPoints(pointsEarned);
+        }
     }
 }
