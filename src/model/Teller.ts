@@ -8,8 +8,8 @@ import {Bundle} from "./Bundle"
 import {Coupon} from "./Coupon"
 import {LoyaltyCard} from "./LoyaltyCard"
 
-// store coupon with its application date
-type AppliedCoupon = { coupon: Coupon, date: Date };
+// store coupon with its application date (exported for ShoppingCart)
+export type AppliedCoupon = { coupon: Coupon, date: Date };
 
 export class Teller {
     // added readonly

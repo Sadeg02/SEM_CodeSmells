@@ -9,8 +9,7 @@ import {Offer} from "./Offer"
 import {SpecialOfferType} from "./SpecialOfferType"
 import {Bundle} from "./Bundle"
 import {Coupon} from "./Coupon"
-
-type AppliedCoupon = { coupon: Coupon, date: Date };
+import {AppliedCoupon} from "./Teller"
 
 type ProductQuantities = { [productName: string]: ProductQuantity }
 export type OffersByProduct = {[productName: string]: Offer};
