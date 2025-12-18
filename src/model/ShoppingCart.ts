@@ -24,8 +24,9 @@ export class ShoppingCart {
         this.addItemQuantity(product, 1.0);
     }
 
+    // now clones like getItems() (was inconsistent)
     productQuantities(): ProductQuantities {
-        return this._productQuantities;
+        return _.clone(this._productQuantities);
     }
 
     public addItemQuantity(product: Product, quantity: number): void {
