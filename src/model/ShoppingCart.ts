@@ -1,4 +1,5 @@
 import {Product} from "./Product"
+import {ProductUnit} from "./ProductUnit"
 import {SupermarketCatalog} from "./SupermarketCatalog"
 import * as _ from "lodash"
 import {ProductQuantity} from "./ProductQuantity"
@@ -6,6 +7,7 @@ import {Discount} from "./Discount"
 import {Receipt} from "./Receipt"
 import {Offer} from "./Offer"
 import {SpecialOfferType} from "./SpecialOfferType"
+import {Bundle} from "./Bundle"
 
 type ProductQuantities = { [productName: string]: ProductQuantity }
 export type OffersByProduct = {[productName: string]: Offer};
@@ -129,5 +131,66 @@ export class ShoppingCart {
     private calculatePercentDiscount(product: Product, quantity: number, unitPrice: number, percentOff: number): Discount {
         const discountAmount = quantity * unitPrice * percentOff / 100.0;
         return new Discount(product, `${percentOff}% off`, discountAmount);
+    }
+
+    // handle bundle offers - 10% off when all items in bundle are bought
+    handleBundles(receipt: Receipt, bundles: Bundle[], catalog: SupermarketCatalog): void {
+        const quantities = this._productQuantities;
+
+        for (const bundle of bundles) {
+            const discount = this.calculateBundleDiscount(bundle, quantities, catalog);
+            if (discount !== null) {
+                receipt.addDiscount(discount);
+            }
+        }
+    }
+
+    // calculate discount for a bundle
+    private calculateBundleDiscount(bundle: Bundle, quantities: ProductQuantities, catalog: SupermarketCatalog): Discount | null {
+        // find how many complete bundles we can make
+        const completeBundles = this.countCompleteBundles(bundle, quantities);
+
+        if (completeBundles === 0) {
+            return null;
+        }
+
+        // calculate bundle value based on actual cart quantities
+        let bundleValue = 0;
+        for (const product of bundle.products) {
+            const unitPrice = catalog.getUnitPrice(product);
+            const qty = quantities[product.name].quantity;
+            // for kilo: use actual weight, for each: use 1 per bundle
+            const qtyPerBundle = product.unit === ProductUnit.Kilo
+                ? qty / completeBundles
+                : 1;
+            bundleValue += unitPrice * qtyPerBundle;
+        }
+
+        // 10% discount on complete bundles
+        const discountPercent = 10;
+        const discountAmount = completeBundles * bundleValue * discountPercent / 100.0;
+
+        // use first product in bundle for discount (needed for Discount class)
+        return new Discount(bundle.products[0], bundle.getDescription(), discountAmount);
+    }
+
+    // count how many complete bundles can be made from cart
+    private countCompleteBundles(bundle: Bundle, quantities: ProductQuantities): number {
+        let minBundles = Infinity;
+
+        for (const product of bundle.products) {
+            const productQty = quantities[product.name];
+            if (!productQty || productQty.quantity <= 0) {
+                return 0; // product not in cart
+            }
+            // for Kilo items: any qty > 0 counts as 1 bundle item
+            // for Each items: use floor to count whole items
+            const count = product.unit === ProductUnit.Kilo
+                ? Math.floor(productQty.quantity + 0.999) // any qty > 0 = at least 1
+                : Math.floor(productQty.quantity);
+            minBundles = Math.min(minBundles, count);
+        }
+
+        return minBundles === Infinity ? 0 : minBundles;
     }
 }
